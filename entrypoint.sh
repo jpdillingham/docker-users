@@ -41,25 +41,28 @@ if [ "${CURRENT_UID}" = "0" ] && [ "${PUID_PGID_SET}" = "true" ]; then
 
     # Create group with the requested GID if it doesn't already exist
     if ! awk -F: -v gid="${PGID}" '$3==gid{found=1}END{exit !found}' /etc/group; then
-        addgroup -g "${PGID}" appgroup
+        groupadd --gid "${PGID}" appgroup
     fi
     GROUPNAME=$(awk -F: -v gid="${PGID}" '$3==gid{print $1}' /etc/group)
 
     # Create user with the requested UID if it doesn't already exist
     if ! awk -F: -v uid="${PUID}" '$3==uid{found=1}END{exit !found}' /etc/passwd; then
-        adduser -D -H -s /sbin/nologin -u "${PUID}" -G "${GROUPNAME}" appuser
+        useradd --uid "${PUID}" --gid "${PGID}" --no-create-home --shell /usr/sbin/nologin appuser
     fi
     USERNAME=$(awk -F: -v uid="${PUID}" '$3==uid{print $1}' /etc/passwd)
 
     echo "[init] Running as '${USERNAME}' (uid=${PUID}, gid=${PGID})"
 
-    # Hand /output to the target user so they can write to it
-    chown "${PUID}:${PGID}" /output
+    # Hand /output to the target user so they can write to it (skip if already correct)
+    CURRENT_OWNER=$(stat -c '%u:%g' /output)
+    if [ "${CURRENT_OWNER}" != "${PUID}:${PGID}" ]; then
+        chown "${PUID}:${PGID}" /output
+    fi
 
     # Drop privileges and re-exec this script as the target user.
     # _PRIV_DROPPED=1 prevents the conflict check from firing on the
     # second pass (we're non-root with PUID/PGID still in the environment).
-    exec su-exec "${USERNAME}" env _PRIV_DROPPED=1 "$0" "$@"
+    exec gosu "${USERNAME}" env _PRIV_DROPPED=1 "$0" "$@"
 fi
 
 # -----------------------------------------------------------------------

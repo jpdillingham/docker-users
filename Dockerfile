@@ -1,7 +1,9 @@
-FROM alpine:3.19
+FROM ubuntu:noble
 
-# su-exec: lightweight setuid/setgid helper (used by linuxserver.io)
-RUN apk add --no-cache su-exec
+# gosu: lightweight setuid/setgid helper (Debian/Ubuntu equivalent of su-exec)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gosu \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
